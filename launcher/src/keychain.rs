@@ -11,7 +11,6 @@
 #![cfg_attr(test, allow(dead_code))]
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
@@ -290,7 +289,7 @@ impl SecretStore for SystemStore {
 /// One item per key, the whole secret in it. A secret an older launcher split over `key.1`,
 /// `key.2`, ... reads whole and folds into the one item, so a read touches a single item — and asks
 /// once — from then on.
-#[cfg(any(target_os = "macos"))]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn get_item(items: &dyn Items, key: &str) -> Option<String> {
     let mut secret = items.read(key).ok().flatten()?;
     let mut split = false;
@@ -311,7 +310,7 @@ fn get_item(items: &dyn Items, key: &str) -> Option<String> {
 
 /// Writes `secret` to `key` and removes `key.1`, `key.2`, ... pieces an older, split secret left:
 /// they would read back as part of this one.
-#[cfg(any(target_os = "macos"))]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn set_item(items: &dyn Items, key: &str, secret: &str) -> Result<(), String> {
     items.write(key, secret)?;
     for n in 1.. {
@@ -323,7 +322,7 @@ fn set_item(items: &dyn Items, key: &str, secret: &str) -> Result<(), String> {
 }
 
 /// Removes `key` and the pieces an older, split secret left beside it.
-#[cfg(any(target_os = "macos"))]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn delete_item(items: &dyn Items, key: &str) -> Result<(), String> {
     for n in 0.. {
         if !items.remove(&piece_key(key, n))? {
