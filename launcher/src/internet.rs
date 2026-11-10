@@ -105,7 +105,7 @@ impl Launcher {
         std::thread::spawn(move || {
             let _ = tx.send(Event::State(tailscale::status()));
             if want_token {
-                let token = account::keychain().get(tailscale::TOKEN_KEY).ok().flatten();
+                let token = crate::keychain::keychain().get(tailscale::TOKEN_KEY).ok().flatten();
                 let _ = tx.send(Event::Token(token));
             }
         });
@@ -175,10 +175,11 @@ impl Launcher {
         }
         self.servers.text(Field::Token).set(String::new());
         self.internet.asking_token = false;
-        self.internet.message = match account::keychain().set(tailscale::TOKEN_KEY, &token) {
-            Ok(()) if account::keychain().persistent() => None,
+        self.internet.message = match crate::keychain::keychain().set(tailscale::TOKEN_KEY, &token) {
+            Ok(()) if crate::keychain::keychain().persistent() => None,
             Ok(()) => Some(Ok(
-                "No keychain here: the token is kept until the launcher closes.".into(),
+                crate::keychain::no_keychain()
+                    .unwrap_or_else(|| "No keychain available.".to_string()),
             )),
             Err(e) => Some(Err(e)),
         };
@@ -187,7 +188,7 @@ impl Launcher {
     }
 
     fn forget_token(&mut self) {
-        let _ = account::keychain().delete(tailscale::TOKEN_KEY);
+        let _ = crate::keychain::keychain().delete(tailscale::TOKEN_KEY);
         let i = &mut self.internet;
         i.token = Some(None);
         i.invites = None;

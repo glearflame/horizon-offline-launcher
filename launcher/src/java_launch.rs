@@ -14,17 +14,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Who plays: the account's name, UUID, Minecraft access token and Xbox user id.
+/// Who plays: the offline name and the UUID a server in offline mode gives it. There is no token:
+/// the game plays offline.
 pub struct Player {
     pub name: String,
     pub uuid: String,
-    pub token: String,
-    pub xuid: String,
 }
 
 impl std::fmt::Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Player({}, <token hidden>)", self.name)
+        write!(f, "Player({})", self.name)
     }
 }
 
@@ -374,11 +373,13 @@ pub fn command(version: &Value, launch: &Launch) -> Result<Command, String> {
     let vars: HashMap<&str, String> = HashMap::from([
         ("auth_player_name", p.name.clone()),
         ("auth_uuid", p.uuid.clone()),
-        ("auth_access_token", p.token.clone()),
-        ("auth_session", format!("token:{}:{}", p.token, p.uuid)),
-        ("auth_xuid", p.xuid.clone()),
+        // No token: the game plays offline, against servers in offline mode. The placeholders
+        // are still there: the version file names them, and the game reads them.
+        ("auth_access_token", String::new()),
+        ("auth_session", format!("token:{}", p.uuid)),
+        ("auth_xuid", String::new()),
         ("clientid", String::new()),
-        ("user_type", "msa".into()),
+        ("user_type", "legacy".into()),
         ("user_properties", "{}".into()),
         ("version_name", id.to_string()),
         (

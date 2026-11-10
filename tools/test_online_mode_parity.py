@@ -176,7 +176,7 @@ def session_file(directory, token):
     path.unlink(missing_ok=True)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'w') as f:
-        json.dump({'name': PLAYER, 'uuid': dashed(PLAYER_UUID), 'access_token': token, 'user_type': 'msa'}, f)
+        json.dump({'name': PLAYER, 'uuid': dashed(PLAYER_UUID), 'access_token': token, 'user_type': 'legacy'}, f)
     return path
 
 

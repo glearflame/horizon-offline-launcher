@@ -55,8 +55,6 @@ impl Launcher {
             || self.starting_pack.is_some()
             || self.pack_busy
             || self.mods.busy.is_some()
-            || !self.auth_busy.is_empty()
-            || (self.sign_in.is_some() && !matches!(self.sign_in_state, Some(SignInState::Done(_))))
             || matches!(self.self_update, SelfUpdate::Downloading(..))
             || self.servers.location_busy()
             || self.importing.location_busy()

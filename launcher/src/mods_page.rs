@@ -1261,7 +1261,7 @@ impl Launcher {
                 cx.notify();
             }));
         // The kinds both sources serve pick theirs: CurseForge is coming soon there, shown,
-        // inert, never searched (like the Microsoft account's "Coming soon").
+        // inert, never searched.
         // A Java instance's files come from Modrinth, for its version.
         let java = self.mods.java_for(self.mods.kind).is_some();
         let source_note = (switches(self.mods.kind) && !java)
@@ -2169,7 +2169,7 @@ pub(super) fn switches(kind: PackKind) -> bool {
 
 impl Launcher {
     /// The source switch: Modrinth or Horizon's registry, CurseForge shown as coming soon and not
-    /// clickable, like the Microsoft account's "Coming soon".
+    /// clickable.
     fn mods_source_switch(&self, cx: &mut Context<Self>) -> Stateful<Div> {
         let this = cx.entity().downgrade();
         source_switch(&self.theme, self.mods.source, move |source, _, cx| {

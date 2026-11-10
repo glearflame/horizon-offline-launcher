@@ -2698,7 +2698,6 @@ name = "horizon-launcher"
 version = "0.2.0"
 dependencies = [
  "base64",
- "chacha20poly1305",
  "chrono",
  "clap",
  "clap_complete",

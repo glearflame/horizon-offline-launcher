@@ -61,6 +61,99 @@ impl Launcher {
                 cx.notify();
             },
         ));
+        // Atalhos customizados: baixar um 26.3.zip de um host remoto e extrair o 26.3.jar dele.
+        // Aponte HORIZON_CUSTOM_JAR_URL para o zip (ex.: uma release do GitHub); o download vai
+        // para ~/Downloads/26.3.zip (ou HORIZON_CUSTOM_JAR_DEST) e o jar extraído fica na pasta
+        // de dados do launcher, em custom-jar/26.3.jar.
+        // Botão com ícone + label abaixo.
+        fn custom_icon_btn(
+            id: &'static str,
+            icon: &'static str,
+            label: &'static str,
+            t: &Theme,
+        ) -> Stateful<Div> {
+            let glyph = ui::icon(icon, 21., white(ink::STRONG));
+            let lbl = text(theme::CAPTION)
+                .text_color(white(ink::NOTE))
+                .text_size(px(12.))
+                .line_height(px(16.))
+                .child(tr(label));
+            keyboard(
+                div()
+                    .id(id)
+                    .flex()
+                    .flex_none()
+                    .flex_col()
+                    .items_center()
+                    .justify_center()
+                    .size(px(56.))
+                    .rounded(px(radius::LARGE))
+                    .bg(white(fill::BUTTON))
+                    .hover(|s| s.bg(white(0.13)))
+                    .cursor_pointer()
+                    .child(glyph)
+                    .child(lbl),
+                t,
+            )
+        }
+        let download_zip = custom_icon_btn(
+            "home-custom-download",
+            "download",
+            "Baixar",
+            &self.theme,
+        )
+        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+            this.custom_jar.status = Some(tr("baixando o 26.3.zip…").to_string());
+            cx.notify();
+            cx.spawn(async move |this, cx| {
+                let state = custom_jar::ensure_extracted();
+                let _ = this.update(cx, |this, _cx| {
+                    this.custom_jar = state.clone();
+                });
+                if let Some(dir) = &state.extracted_dir {
+                    crate::glass_toast::say(trf(
+                        "26.3 extraído em {}",
+                        &[("path", &dir.display().to_string())],
+                    ));
+                } else if let Some(status) = &state.status {
+                    crate::glass_toast::say(trf("{status}", &[("status", status)]));
+                }
+            })
+            .detach();
+        }));
+        let play_263 = custom_icon_btn(
+            "home-custom-play",
+            "play",
+            "Jogar",
+            &self.theme,
+        )
+        .on_click(cx.listener(move |_this, _: &ClickEvent, _, cx| {
+            cx.spawn(async move |this, cx| {
+                let _ = custom_jar::ensure_extracted();
+                let _ = this.update(cx, |this, cx| {
+                    this.launch_custom_263(cx);
+                });
+            })
+            .detach();
+        }));
+        let extract_jar = custom_icon_btn(
+            "home-custom-extract",
+            "package",
+            "Extrair",
+            &self.theme,
+        )
+        .on_click(cx.listener(move |_this, _: &ClickEvent, _, cx| {
+            let dir = custom_jar::extracted_dir();
+            if dir.join("versions").join("26.3").join("26.3.jar").is_file() {
+                crate::glass_toast::say(trf(
+                    "26.3 já está em {}",
+                    &[("path", &dir.display().to_string())],
+                ));
+            } else {
+                    crate::glass_toast::say(tr("prima \"baixar o 26.3.zip\" primeiro"));
+                }
+                cx.notify();
+            }));
         let actions = if wide {
             div()
                 .mt(px(32.))
@@ -72,6 +165,9 @@ impl Launcher {
                 .child(self.play_group(tag, prepared || java.is_some(), cx))
                 .children(java.is_none().then(|| self.glass_picker(cx)))
                 .children(Some(mods))
+                .children(Some(download_zip))
+                .children(Some(play_263))
+                .children(Some(extract_jar))
                 .children(self.folder_group(java.is_none(), cx))
                 .child(div().flex_1().min_w(px(22.)))
                 .child(self.glass_join_friend(tag, true, cx))
@@ -90,6 +186,9 @@ impl Launcher {
                         .children(java.is_none().then(|| self.glass_picker(cx)))
                         .children(self.folder_group(java.is_none(), cx)),
                 )
+                .children(Some(download_zip))
+                .children(Some(play_263))
+                .children(Some(extract_jar))
                 .child(self.glass_join_friend(tag, false, cx))
         };
         div()
@@ -417,7 +516,7 @@ impl Launcher {
                     Some(_) => (tr("Update"), "download-04"),
                     None => (tr("Play"), "play"),
                 };
-                let press = play_press(ready, self.owner, false);
+                let press = play_press(ready, false);
                 let main = body(label.into(), icon).id("play").cursor_pointer();
                 let main = match (&update, press) {
                     (Some(_), _) => main.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {

@@ -62,13 +62,13 @@ Prepare a version's resources from your own Minecraft install, or from Mojang.
     horizon-launcher prepare
 
 - `--minecraft`: The game folder of the official launcher, Prism Launcher, MultiMC, the Modrinth App, ATLauncher or GDLauncher (default: the launcher's, then every launcher's default)
-- `--download`: Download Minecraft from Mojang for the signed-in account that owns it, instead of using an install
+- `--download`: Download Minecraft from Mojang, instead of using an install
 
 MCP: `prepare`.
 
 ## `horizon-launcher play`
 
-Start the client (needs a signed-in Microsoft account that owns Minecraft: Java Edition).
+Start the client (offline, as the name the launcher picked).
 
     horizon-launcher play
 
@@ -78,7 +78,7 @@ Start the client (needs a signed-in Microsoft account that owns Minecraft: Java 
 - `--join`: Join a friend's world with its invite code
 - `--server`: Join this server at once: an address, or a server of the list by name or position
 - `--arg`: An extra argument for the game, passed through as-is (repeatable), for example --server-thread
-- `--account`: Play this launch as this signed-in account (its name or UUID), without changing the one `account select` picked: several games can play as several accounts at once
+- `--account`: Play this launch as this offline name, without changing the one `account select` picked: several games can play as several names at once
 
 MCP: `play`, then the `game_*` tools.
 
@@ -140,55 +140,15 @@ MCP: `links`.
 
 ## `horizon-launcher account list`
 
-The signed-in accounts and which one plays.
+The offline names and which one plays.
 
     horizon-launcher account list
 
 MCP: `account_list`.
 
-## `horizon-launcher account sign-in`
-
-Sign in with a Microsoft account in your browser (device code). Play needs one that owns Minecraft: Java Edition.
-
-    horizon-launcher account sign-in
-
-- `--for`: Sign this account (name or UUID) in again: another Microsoft account is refused and who plays stays the same
-
-MCP: `account_sign_in`.
-
-## `horizon-launcher account refresh`
-
-Renew an account's session now, even when its access token is still fresh.
-
-    horizon-launcher account refresh <WHO>
-
-- `WHO`
-
-MCP: `account_refresh`.
-
-## `horizon-launcher account session`
-
-Renew an account's session for a game already running: prints the read-once session file it hands over (`--json`: {"session_file"} or {"authentication"} when it can't).
-
-    horizon-launcher account session <WHO>
-
-- `WHO`
-
-MCP: none: the game's own session handoff.
-
-## `horizon-launcher account sign-out`
-
-Sign out: the account's tokens leave the keychain (and the secrets file, where it kept them).
-
-    horizon-launcher account sign-out <WHO>
-
-- `WHO`: Its name or UUID
-
-MCP: `account_sign_out`, needs `confirm: true`.
-
 ## `horizon-launcher account select`
 
-Play as this account, or as one of your offline names.
+Play as one of your offline names.
 
     horizon-launcher account select <WHO>
 
@@ -198,7 +158,7 @@ MCP: `account_select`.
 
 ## `horizon-launcher account offline`
 
-Play offline (LAN, offline-mode servers) beside a signed-in account that owns the game: as NAME (kept to switch back to; 3 to 16 letters, digits or _), or as the name the game made up.
+Play offline (LAN, offline-mode servers): as NAME (kept to switch back to; 3 to 16 letters, digits or _), or as the name the game made up.
 
     horizon-launcher account offline [NAME]
 

@@ -182,6 +182,10 @@ pub struct JavaGame {
     /// The game window's size, width then height; none: the game's own 854×480.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<(u32, u32)>,
+    /// A custom Minecraft folder (versions/, libraries/, assets/) to play from instead of the
+    /// launcher's default. Used for a custom version such as 26.3 extracted from a zip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minecraft_dir: Option<PathBuf>,
 }
 
 impl Instance {
@@ -489,6 +493,20 @@ pub fn create_java(name: &str, minecraft: &str) -> Result<Instance, String> {
         None,
         Some(minecraft),
     )
+}
+
+/// Creates a Java instance playing `minecraft`, with a custom Minecraft folder (e.g. 26.3
+/// extracted from a zip) instead of the launcher's default.
+pub fn create_java_custom(name: &str, minecraft: &str, minecraft_dir: PathBuf) -> Result<Instance, String> {
+    let instance = create_java(name, minecraft)?;
+    let mut store = Store::load(&backend::data_dir());
+    if let Some(meta) = store.instances.get_mut(&instance.id) {
+        if let Some(java) = &mut meta.java {
+            java.minecraft_dir = Some(minecraft_dir);
+        }
+    }
+    store.save(&backend::data_dir())?;
+    Ok(instance)
 }
 
 /// What creating or renaming an instance says when another already has `name`.

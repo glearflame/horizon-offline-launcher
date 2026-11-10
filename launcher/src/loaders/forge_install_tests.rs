@@ -403,8 +403,6 @@ fn a_real_installer_installs() {
     let player = crate::java_launch::Player {
         name: "Dev".into(),
         uuid: "00000000000000000000000000000000".into(),
-        token: "none".into(),
-        xuid: String::new(),
     };
     let command = crate::java_launch::command(
         &version,

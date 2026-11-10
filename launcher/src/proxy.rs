@@ -4,10 +4,10 @@
 //! and `NO_PROXY` variables apply, so a launcher started from a shell that has them needs nothing.
 //!
 //! What goes through it: Horizon's releases and the launcher's own update, Minecraft's files and
-//! Java from Mojang, Modrinth, CurseForge, Horizon's mod registry, pictures, Microsoft sign-in,
-//! Tailscale's API, and the jars a modpack import downloads. A local address never does, and the
-//! Servers page's calls to a game server's API (`servers.rs`) build their agent without it: they
-//! are on loopback and asked every second.
+//! Java from Mojang, Modrinth, CurseForge, Horizon's mod registry, pictures, Tailscale's API, and
+//! the jars a modpack import downloads. A local address never does, and the Servers page's calls
+//! to a game server's API (`servers.rs`) build their agent without it: they are on loopback and
+//! asked every second.
 //!
 //! Which hosts are reached directly, and how an address is read, are `horizon-port-pack`'s rules
 //! (`crates/horizon-port-pack/src/net.rs`): the jars an import fetches are downloaded there, and

@@ -84,10 +84,8 @@ impl Launcher {
                 });
             }
         }
-        // `in_top_bar`: a page the top bar hides stays out of the palette too.
-        for (page, label, _) in
-            Page::in_top_bar(self.wardrobe_shown()).chain([(Page::Settings, "Settings", "")])
-        {
+        // The top bar's pages, then Settings, which has its own button there.
+        for (page, label, _) in Page::in_top_bar().chain([(Page::Settings, "Settings", "")]) {
             all.push(Command {
                 label: trf("Open {page}", &[("page", tr(label))]),
                 hint: tr("Page").to_string(),

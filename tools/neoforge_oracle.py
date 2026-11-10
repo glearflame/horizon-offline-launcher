@@ -128,7 +128,7 @@ def client_command(java, heap, game_dir, natives, assets, jvm=(), game=()):
     command += [*jvm, neo['mainClass']]
     command += ['--username', 'Bench', '--uuid', '00000000000000000000000000000000', '--accessToken', '0',
                 '--version', f'neoforge-{NEOFORGE}', '--gameDir', str(game_dir), '--assetsDir', str(assets),
-                '--assetIndex', base['assetIndex']['id'], '--userType', 'msa', '--versionType', 'release',
+                '--assetIndex', base['assetIndex']['id'], '--userType', 'legacy', '--versionType', 'release',
                 *neo['arguments']['game'], *game]
     return home, command
 

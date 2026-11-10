@@ -248,12 +248,12 @@ pub fn delete_my_data() -> Result<String, String> {
     ))
 }
 
-/// Hides the player's account names and UUIDs and their worlds' folder names, besides what
-/// `Scrubber` finds on its own.
+/// Hides the player's offline names and their worlds' folder names, besides what `Scrubber`
+/// finds on its own.
 pub fn scrubber() -> Scrubber {
     let mut s = Scrubber::new();
-    for account in Accounts::load().accounts {
-        s = s.term(account.name).term(account.uuid);
+    for name in Accounts::load().offline {
+        s = s.term(name);
     }
     let saves = std::fs::read_dir(home().join("saves"))
         .into_iter()

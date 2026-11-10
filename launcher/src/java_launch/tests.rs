@@ -21,8 +21,6 @@ fn player() -> Player {
     Player {
         name: "Notch".into(),
         uuid: "069a79f444e94726a5befca90e38aaf5".into(),
-        token: "mc-token".into(),
-        xuid: "2535400000000000".into(),
     }
 }
 
@@ -99,10 +97,11 @@ fn a_modern_version_gets_its_rules_placeholders_and_classpath() {
     assert!(at("-XX:+UseZGC") < at("net.minecraft.client.main.Main"));
     assert!(a.contains(&"-Dminecraft.launcher.brand=horizon-launcher".into()));
     assert_eq!(a[at("--username") + 1], "Notch");
-    assert_eq!(a[at("--accessToken") + 1], "mc-token");
+    // Offline: no token, and the user type says so.
+    assert_eq!(a[at("--accessToken") + 1], "");
     assert_eq!(a[at("--assetIndex") + 1], "19");
     assert_eq!(a[at("--gameDir") + 1], game.to_string_lossy());
-    assert_eq!(a[at("--userType") + 1], "msa");
+    assert_eq!(a[at("--userType") + 1], "legacy");
     // Features are off: no demo, no custom size.
     assert!(!a.iter().any(|x| x == "--demo" || x == "--width"));
     let sep = if cfg!(windows) { ";" } else { ":" };
@@ -198,7 +197,7 @@ fn an_old_version_gets_its_natives_and_assets_by_name() {
     assert_eq!(a[at("--assetsDir") + 1], virtual_dir.to_string_lossy());
     assert_eq!(
         a[at("--session") + 1],
-        "token:mc-token:069a79f444e94726a5befca90e38aaf5"
+        "token:069a79f444e94726a5befca90e38aaf5"
     );
     assert_eq!(a[at("--userProperties") + 1], "{}");
     assert_eq!(a[at("--unknown") + 1], "${nothing}");

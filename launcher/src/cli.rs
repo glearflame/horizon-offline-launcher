@@ -106,31 +106,12 @@ enum ServersCmd {
 
 #[derive(Subcommand)]
 enum AccountCmd {
-    /// The signed-in accounts and which one plays
+    /// The offline names and which one plays
     List,
-    /// Sign in with a Microsoft account in your browser (device code). Play needs one that owns
-    /// Minecraft: Java Edition
-    SignIn {
-        /// Sign this account (name or UUID) in again: another Microsoft account is refused and
-        /// who plays stays the same
-        #[arg(long = "for")]
-        target: Option<String>,
-    },
-    /// Renew an account's session now, even when its access token is still fresh
-    Refresh { who: String },
-    /// Renew an account's session for a game already running: prints the read-once session file
-    /// it hands over (`--json`: {"session_file"} or {"authentication"} when it can't)
-    Session { who: String },
-    /// Sign out: the account's tokens leave the keychain (and the secrets file, where it kept them)
-    SignOut {
-        /// Its name or UUID
-        who: String,
-    },
-    /// Play as this account, or as one of your offline names
+    /// Play as one of your offline names
     Select { who: String },
-    /// Play offline (LAN, offline-mode servers) beside a signed-in account that owns the game:
-    /// as NAME (kept to switch back to; 3 to 16 letters, digits or _), or as the name the game
-    /// made up
+    /// Play offline (LAN, offline-mode servers): as NAME (kept to switch back to; 3 to 16 letters,
+    /// digits or _), or as the name the game made up
     Offline { name: Option<String> },
     /// Forget one of your offline names; its skin and cape go with it
     ForgetOffline { name: String },
@@ -735,15 +716,14 @@ enum Cmd {
         /// ATLauncher or GDLauncher (default: the launcher's, then every launcher's default)
         #[arg(long, conflicts_with = "download")]
         minecraft: Option<PathBuf>,
-        /// Download Minecraft from Mojang for the signed-in account that owns it, instead of
-        /// using an install
+        /// Download Minecraft from Mojang, instead of using an install
         #[arg(long)]
         download: bool,
         /// The installed version (default: the selected one)
         #[arg(long)]
         version: Option<String>,
     },
-    /// Start the client (needs a signed-in Microsoft account that owns Minecraft: Java Edition)
+    /// Start the client (offline, as the name the launcher picked)
     Play {
         #[arg(long)]
         version: Option<String>,
@@ -767,8 +747,8 @@ enum Cmd {
         /// --server-thread
         #[arg(long = "arg", value_name = "ARG", allow_hyphen_values = true)]
         arg: Vec<String>,
-        /// Play this launch as this signed-in account (its name or UUID), without changing
-        /// the one `account select` picked: several games can play as several accounts at once
+        /// Play this launch as this offline name, without changing the one `account select`
+        /// picked: several games can play as several names at once
         #[arg(long, value_name = "WHO")]
         account: Option<String>,
     },
@@ -840,7 +820,7 @@ enum Cmd {
     Notes { tag: Option<String> },
     /// Show the Discord, sponsor and website links
     Links,
-    /// Microsoft accounts: list them (the default), sign in, sign out, or pick the one that plays
+    /// Offline names: list them (the default), pick the one that plays, or forget one
     Account {
         #[command(subcommand)]
         action: Option<AccountCmd>,
@@ -1179,7 +1159,6 @@ pub fn run() -> Option<i32> {
             let result = execute(command, cli.json);
             // A game it started has ended (attached) or none did (an error): a session file it
             // didn't read goes now.
-            account::discard_unread_sessions();
             result
         }
     };
@@ -1510,9 +1489,6 @@ fn execute(command: Cmd, as_json: bool) -> Result<(), String> {
                 });
                 let mut cmd =
                     backend::java_game(&instance, server.as_deref(), &|line| eprintln!("{line}"))?;
-                if let Some(e) = account::take_unsaved() {
-                    eprintln!("{e}");
-                }
                 cmd.args(arg);
                 let vars = instance.vars(cmd.get_program());
                 cmd.envs(vars.iter().map(|(k, v)| (k, v)));
@@ -1524,24 +1500,28 @@ fn execute(command: Cmd, as_json: bool) -> Result<(), String> {
                 after_exit(&instance, &vars);
                 return played;
             }
-            // Who plays this launch; the accounts below choose it in memory only, for its
-            // `--name` and look.
+            // Who plays this launch: an offline name, for this launch only. The accounts below
+            // choose it in memory only, for its `--name` and look.
             let mut accounts = Accounts::load();
             let who = match account {
-                Some(who) => Some(account::Player::Microsoft(
-                    accounts
-                        .find(&who)
+                Some(who) => {
+                    let name = accounts
+                        .offline
+                        .iter()
+                        .find(|n| n.eq_ignore_ascii_case(&who))
+                        .cloned()
                         .ok_or_else(|| {
-                            format!("No signed-in account {who}. See `horizon-launcher account`.")
-                        })?
-                        .uuid
-                        .clone(),
-                )),
+                            format!(
+                                "No offline name {who}: add it with \
+                                 `horizon-launcher account offline {who}`."
+                            )
+                        })?;
+                    // In memory only: the name the launcher plays with stays the same.
+                    accounts.offline_selected = Some(name.clone());
+                    Some(account::Player::Offline(name))
+                }
                 None => None,
             };
-            if let Some(who) = &who {
-                accounts.play_as(account::store(), who.clone())?;
-            }
             let mut cmd =
                 backend::client_as(&instance.resolve_version(version.as_deref())?, who.as_ref())?;
             instances::apply(&mut cmd, &instance)?;
@@ -1923,166 +1903,60 @@ fn update(check: bool, as_json: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// `account …`: names and UUIDs only; tokens are never printed.
+/// `account …`: the offline names and the one that plays. The launcher keeps nothing else about
+/// the player here.
 fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
     let mut accounts = Accounts::load();
-    let find = |accounts: &Accounts, who: &str| {
-        accounts
-            .find(who)
-            .cloned()
-            .ok_or_else(|| format!("No signed-in account {who}. See `horizon-launcher account`."))
-    };
     match action {
         AccountCmd::List => {
             if as_json {
                 json(serde_json::json!({
-                    "accounts": accounts.accounts.iter().map(|a| serde_json::json!({
-                        "name": a.name, "uuid": a.uuid,
-                        "selected": accounts.selected.as_ref() == Some(&a.uuid),
-                        "authentication": account::session::status(account::store(), &a.uuid),
-                    })).collect::<Vec<_>>(),
                     "offline": accounts.offline.iter().map(|n| serde_json::json!({
                         "name": n,
-                        "selected": accounts.player() == account::Player::Offline(n.clone()),
+                        "selected": plays_as(&accounts, n),
                     })).collect::<Vec<_>>(),
-                    "sign_in_configured": account::client_id().is_some(),
-                    "owner": accounts.has_owner(account::store()),
+                    "plays_as": accounts.offline_selected.clone(),
                 }));
-            } else if accounts.accounts.is_empty() && accounts.offline.is_empty() {
+            } else if accounts.offline.is_empty() {
                 println!(
-                    "No Microsoft account signed in. Play needs one that owns Minecraft: Java \
-                     Edition: horizon-launcher account sign-in"
+                    "No offline name yet: add one with `horizon-launcher account offline NAME`. \
+                     The game plays as the name it made up."
                 );
             } else {
-                for a in &accounts.accounts {
-                    let mark = if accounts.selected.as_ref() == Some(&a.uuid) {
-                        "*"
-                    } else {
-                        " "
-                    };
-                    let status = account::session::status(account::store(), &a.uuid);
-                    // Why it couldn't be checked (a keyring that didn't answer, #12179).
-                    let why = match status.state {
-                        account::session::State::Retry => format!(": {}", status.message),
-                        _ => String::new(),
-                    };
-                    println!("{mark} {}  {}  {}{why}", a.name, a.uuid, status.label());
-                }
                 for n in &accounts.offline {
-                    let on = accounts.player() == account::Player::Offline(n.clone());
-                    println!("{} {n}  offline", if on { "*" } else { " " });
+                    println!("{} {n}  offline", if plays_as(&accounts, n) { "*" } else { " " });
                 }
-                if accounts.player() == account::Player::GameName {
+                if accounts.offline_selected.is_none() {
                     println!(
                         "Playing offline as the game's own name (`account select NAME` to switch)."
                     );
                 }
-                if !accounts.has_owner(account::store()) {
-                    println!(
-                        "{} {}",
-                        account::NoOwner::default(),
-                        tr(backend::SIGN_IN_HINT)
-                    );
-                }
             }
-        }
-        AccountCmd::Refresh { who } => {
-            let status = account::session::refresh(&who)?;
-            if as_json {
-                json(serde_json::to_value(&status).map_err(|e| e.to_string())?);
-            } else if status.state != account::session::State::Ready {
-                return Err(format!("{}: {}", status.label(), status.message));
-            } else {
-                println!("{}: {}", status.label(), status.message);
-            }
-        }
-        AccountCmd::Session { who } => {
-            let dir = backend::game_home().join("sessions");
-            match (account::session::renew_for_game(&dir, &who), as_json) {
-                (Ok(file), true) => json(serde_json::json!({ "session_file": file })),
-                (Ok(file), false) => println!("{}", file.display()),
-                (Err(status), true) => json(serde_json::json!({ "authentication": status })),
-                (Err(status), false) => return Err(status.message),
-            }
-        }
-        AccountCmd::SignIn { target: Some(who) } => {
-            let a = find(&accounts, &who)?;
-            let sign_in = account::SignIn::start_for(a.clone());
-            let mut shown = false;
-            let signed_in = loop {
-                match sign_in.state() {
-                    account::SignInState::Code(code) if !shown => {
-                        shown = true;
-                        if as_json {
-                            json(serde_json::json!({
-                                "link": code.verification_uri,
-                                "code": code.user_code,
-                            }));
-                        } else {
-                            eprintln!(
-                                "To sign {} in again, open {} in a browser and enter the code {}",
-                                a.name, code.verification_uri, code.user_code
-                            );
-                        }
-                    }
-                    account::SignInState::Done(result) => break result?,
-                    _ => {}
-                }
-                std::thread::sleep(std::time::Duration::from_millis(200));
-            };
-            if as_json {
-                json(serde_json::json!({ "signed_in": signed_in.uuid }));
-            } else {
-                println!("Signed in as {} again.", signed_in.name);
-            }
-        }
-        AccountCmd::SignIn { target: None } => {
-            let client_id = account::client_id().ok_or(account::NOT_CONFIGURED)?;
-            let ep = account::Endpoints::live();
-            let code = account::device_code(&ep, &client_id)?;
-            eprintln!(
-                "To sign in, open {} in a browser and enter the code {}",
-                code.verification_uri, code.user_code
-            );
-            let ms = account::wait_for_sign_in(&ep, &client_id, &code, &|| false)?;
-            let (signed_in, secrets) = account::finish_sign_in(&ep, ms)?;
-            accounts.add(account::store(), signed_in.clone(), &secrets)?;
-            accounts.save()?;
-            println!("Signed in as {}.", signed_in.name);
-            if let Some(said) = account::no_keychain() {
-                eprintln!("{said}");
-            }
-        }
-        AccountCmd::SignOut { who } => {
-            let a = find(&accounts, &who)?;
-            accounts.remove(account::store(), &a.uuid)?;
-            accounts.save()?;
-            println!("Signed out {}.", a.name);
         }
         AccountCmd::Select { who } => {
-            let offline = accounts
+            let name = accounts
                 .offline
                 .iter()
                 .find(|n| n.eq_ignore_ascii_case(&who))
-                .cloned();
-            let (player, name) = match (accounts.find(&who).cloned(), offline) {
-                (Some(a), _) => (account::Player::Microsoft(a.uuid), a.name),
-                (None, Some(n)) => (
-                    account::Player::Offline(n.clone()),
-                    format!("{n} (offline)"),
-                ),
-                (None, None) => return Err(find(&accounts, &who).unwrap_err()),
-            };
-            accounts.play_as(account::store(), player)?;
+                .cloned()
+                .ok_or_else(|| {
+                    format!(
+                        "No offline name {who}: add it with \
+                         `horizon-launcher account offline {who}`."
+                    )
+                })?;
+            accounts.offline_selected = Some(name.clone());
             accounts.save()?;
             println!("The game plays as {name}.");
         }
         AccountCmd::Offline { name } => {
-            let player = match name {
-                Some(n) => account::Player::Offline(n),
-                None => account::Player::GameName,
-            };
-            accounts.play_as(account::store(), player)?;
+            match name {
+                Some(name) => {
+                    let name = keep_offline(&mut accounts, &name)?;
+                    accounts.offline_selected = Some(name);
+                }
+                None => accounts.offline_selected = None,
+            }
             accounts.save()?;
             match accounts.name_arg() {
                 Some(n) => println!("The game plays offline as {n}."),
@@ -2151,6 +2025,30 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Whether the offline name `name` is the one the game plays as.
+fn plays_as(accounts: &Accounts, name: &str) -> bool {
+    accounts
+        .offline_selected
+        .as_deref()
+        .is_some_and(|selected| selected.eq_ignore_ascii_case(name))
+}
+
+/// Keeps an offline name (once, in any case) and returns it as kept: the same rule the window's
+/// own switch uses, so a name typed here plays as itself.
+fn keep_offline(accounts: &mut Accounts, name: &str) -> Result<String, String> {
+    let name = name.trim();
+    if !account::valid_offline_name(name) {
+        return Err(format!(
+            "{name}: an offline name is 3 to 16 letters, digits or _"
+        ));
+    }
+    if let Some(kept) = accounts.offline.iter().find(|n| n.eq_ignore_ascii_case(name)) {
+        return Ok(kept.clone());
+    }
+    accounts.offline.push(name.to_string());
+    Ok(name.to_string())
 }
 
 /// `data`: the same consent as Settings → Data collection.

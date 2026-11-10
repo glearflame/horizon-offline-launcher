@@ -64,12 +64,10 @@ pub(super) enum Field {
     DeleteServer,
     /// Settings' accent as hex (`themes_page.rs`).
     AccentHex,
-    /// The Shop's gift recipient (`wardrobe_page/shop/basket.rs`).
-    ShopGift,
 }
 
 impl Field {
-    const ALL: [Field; 25] = [
+    const ALL: [Field; 24] = [
         Field::Name,
         Field::Seed,
         Field::Players,
@@ -94,7 +92,6 @@ impl Field {
         Field::OfflineName,
         Field::DeleteServer,
         Field::AccentHex,
-        Field::ShopGift,
     ];
 }
 
@@ -402,12 +399,12 @@ pub(super) fn keep_running_through_update() {
     STARTED_HERE.lock().unwrap().clear();
 }
 
-/// The player's own name, to let them in on a friends-only server: the Microsoft account that plays,
+/// The player's own name, to let them in on a friends-only server: the offline name that plays,
 /// else the name the game made up for them (`horizon-player.txt`).
 fn own_name(accounts: &Accounts) -> Option<String> {
     accounts
-        .selected()
-        .map(|a| a.name.clone())
+        .offline_selected
+        .clone()
         .or_else(crate::offline_name)
 }
 
@@ -1294,7 +1291,6 @@ impl Launcher {
             }
             Field::MemoryLimit => self.memory_enter(),
             Field::OfflineName => self.offline_name_enter(),
-            Field::ShopGift => self.shop.find_soon = true,
             Field::ServerName | Field::ServerAddress => self.add_server(),
         }
     }
@@ -2624,7 +2620,7 @@ impl Launcher {
                 if accounts {
                     format!(
                         "{} {later}",
-                        tr("On: players must own Minecraft and sign in with Microsoft.")
+                        tr("On: players must own Minecraft and sign in.")
                     )
                 } else {
                     format!(

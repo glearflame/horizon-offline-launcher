@@ -580,9 +580,9 @@ pub struct NewServer {
     pub max_players: u32,
     /// Only listed players (and operators) may join.
     pub friends_only: bool,
-    /// Check players' Minecraft accounts: they must sign in with Microsoft. On by default; an offline
-    /// server is a security risk, so it is turned off only per server (`--offline`, or the server's
-    /// settings page).
+    /// Check players' Minecraft accounts: they must own the game and sign in. On by default; an
+    /// offline server is a security risk, so it is turned off only per server (`--offline`, or the
+    /// server's settings page).
     pub check_accounts: bool,
     /// Who may join first (whitelisted), and the first of them becomes an operator.
     pub players: Vec<String>,

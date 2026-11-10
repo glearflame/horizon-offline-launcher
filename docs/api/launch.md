@@ -17,17 +17,17 @@ reference implementation. Proposed in horizon-rust/horizon#3545.
 
 The whole way, from picking a build to playing: [launch-guide.md](launch-guide.md). In short:
 
-1. Start Horizon only for a player signed in with a Microsoft account that owns Minecraft: Java Edition, and
-   hand over that account's session (`--session-stdin`, or `--session-file`), never on the command line. This
-   is the same owner gate `horizon-launcher` applies before every start. Horizon never downloads Mojang's
-   files; a launcher that does downloads them only for that owner.
+1. Start Horizon for an offline player: the name it plays as (`--name <offline name>`), and the
+   game derives its offline UUID from that name. There is no account to sign in and no session to
+   hand over. `horizon-launcher` plays any offline name the player keeps, and downloads nothing
+   from Mojang beyond what that player's own install already holds.
 2. Ask the build what it takes: `horizon-client --launch-api` prints JSON with `launch_api` (the version),
    `options` and `content` (which mods, shader packs and packs it loads). Pass only options it lists: any other is
    refused with exit code 2.
 3. Start it with a folder per instance:
 
    ```sh
-   horizon-client --resources PREPARED --game-dir INSTANCE --home INSTANCE --width 1280 --height 720 --session-stdin
+   horizon-client --resources PREPARED --game-dir INSTANCE --home INSTANCE --width 1280 --height 720 --name PLAYER
    ```
 
 4. Watch the exit code. On 2, stderr names the refused option (`Horizon: --width: …`). On 1 or 101, the last
@@ -38,21 +38,13 @@ The whole way, from picking a build to playing: [launch-guide.md](launch-guide.m
 [launch-reference.md](launch-reference.md), generated from `crates/horizon-client/src/game/launch_api.rs`: every
 option, the `--launch-api` reply and the exit codes.
 
-### The session JSON
+### Playing as an offline name
 
-The account the game joins online-mode servers with ([microsoft-account.md](../microsoft-account.md)):
-
-```json
-{"name": "Alex", "uuid": "069a79f444e94726a5befca90e38aaf5", "access_token": "…", "user_type": "msa", "xuid": "…"}
-```
-
-- `name`, `uuid` (with or without dashes) and `access_token` are required; `user_type`, when present, is `msa`;
-  `xuid` is optional.
-- `--session-stdin`: write the JSON to the game's standard input and close it.
-- `--session-file PATH`: a file the game reads once and deletes at once. On Unix its mode must be 0600; a file
-  older than two minutes is refused (and deleted).
-- A session the game can't read is reported on stderr (`Horizon: not signed in: …`), and online-mode servers
-  will refuse the player.
+The game plays as an offline name, never as a Microsoft account. There is no session JSON, no
+`--session-stdin` and no `--session-file`. The launcher passes `--name <offline name>` and the
+game derives the offline UUID from it (`UUID.nameUUIDFromBytes("OfflinePlayer:<name>")`, the same
+an offline-mode server gives it). Online-mode servers still require a real Minecraft account, but
+that is the player's own business in the game — the launcher never sees a token.
 
 ## Preparing
 
@@ -86,8 +78,7 @@ horizon-prepare --check --output PREPARED
   would give. Every file is still checked against the pins. When an earlier import beside the preparer is still
   verified, it is reused and these files aren't read.
 - `--server-jar PATH`: the first `--prepare` needs the server jar, which no launcher keeps. Horizon never
-  downloads it; a launcher downloads it (the version JSON's `downloads.server`) only for a signed-in account
-  that owns Java Edition, as `horizon-launcher` does.
+  downloads it; a launcher downloads it (the version JSON's `downloads.server`).
 - `--java-home PATH`: a Java of the pinned version that the launcher manages, tried after `JAVA_HOME` and the
   `PATH`, before the official launcher's runtimes.
 - Exit codes: 0 done, 1 failed or gaps found, 2 a refused command line.
@@ -105,7 +96,7 @@ horizon-prepare --check --output PREPARED
 
 ```sh
 horizon-client --launch-api
-printf '%s' "$SESSION_JSON" | horizon-client --resources ~/horizon/prepared --game-dir ~/instances/a --session-stdin --fullscreen
+horizon-client --resources ~/horizon/prepared --game-dir ~/instances/a --name Notch --fullscreen
 ```
 
 ## Stability
@@ -121,6 +112,6 @@ test keeps the contract and the code together.
 ## Changelog
 
 - 0.1.0 (not released yet, so still one version): `horizon-client`'s `--game-dir`, `--home`, `--player-dir`, `--fullscreen`,
-  `--session-stdin`, `--launch-api` (with `content`), exit code 2 for a refused command line; `horizon-prepare`'s `--launch-api`,
+  `--name`, `--launch-api` (with `content`), exit code 2 for a refused command line; `horizon-prepare`'s `--launch-api`,
   `--output`, `--check`, `--complete`, `--progress json`, `--version-json`, `--client-jar`, `--libraries-dir`,
   `--assets-dir` and `--java-home`.

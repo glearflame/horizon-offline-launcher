@@ -886,7 +886,7 @@ def scenario_signedin():
     print('signedin: P1 signed into an account, another player joins under its own profile')
     session = Path(tempfile.mkdtemp(prefix='horizon-session-')) / 'session.json'
     session.write_text(json.dumps({'name': 'Signed', 'uuid': '069a79f444e94726a5befca90e38aaf5',
-                                   'access_token': 'not-a-real-token', 'user_type': 'msa'}))
+                                   'access_token': 'not-a-real-token', 'user_type': 'legacy'}))
     session.chmod(0o600)
     g = Game(2, args=('--session-file', str(session)))
     try:
@@ -1357,7 +1357,7 @@ def scenario_launcher():
     # P1's own world is offline-mode).
     session = folder / 'session-ann.json'
     session.write_text(json.dumps({'name': 'Ann', 'uuid': '069a79f444e94726a5befca90e38aaf5',
-                                   'access_token': 'not-a-real-token', 'user_type': 'msa'}))
+                                   'access_token': 'not-a-real-token', 'user_type': 'legacy'}))
     session.chmod(0o600)
     os.environ['HORIZON_ACCOUNT_SESSIONS'] = json.dumps(
         [{'name': 'Ann', 'uuid': '069a79f444e94726a5befca90e38aaf5', 'file': str(session)}, {'name': 'Cal', 'uuid': '00000000000000000000000000000001', 'skipped': 'Sign in again'}])

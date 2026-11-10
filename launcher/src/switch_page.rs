@@ -8,12 +8,6 @@ impl Launcher {
     /// The chip's two lines: the name that plays, and how.
     pub(super) fn who_plays(&self) -> (String, &'static str) {
         match self.accounts.player() {
-            Player::Microsoft(_) => (
-                self.accounts
-                    .selected()
-                    .map_or_else(String::new, |a| a.name.clone()),
-                tr("Microsoft account"),
-            ),
             Player::Offline(name) => (name, tr("Offline")),
             Player::GameName => (
                 self.offline_name.clone().unwrap_or_else(|| "Player".into()),
@@ -24,36 +18,22 @@ impl Launcher {
 
     pub(super) fn play_as(&mut self, who: Player) {
         let mut accounts = Accounts::load();
-        let done = accounts
-            .play_as_with(account::store(), who, self.settings.dev_offline)
-            .and_then(|()| accounts.save());
+        let done = accounts.play_as(who).and_then(|()| accounts.save());
         match done {
             Ok(()) => self.accounts = accounts,
-            Err(e) => self.sign_in_state = Some(SignInState::Done(Err(e))),
+            Err(e) => crate::glass_toast::say(e),
         }
         self.account_menu = false;
     }
 
-    /// Everyone the player can play as, with how each signs in.
+    /// Everyone the player can play as, with how each plays.
     pub(super) fn players(&self) -> Vec<(Player, String, &'static str)> {
         let mut out: Vec<_> = self
             .accounts
-            .accounts
+            .offline
             .iter()
-            .map(|a| {
-                (
-                    Player::Microsoft(a.uuid.clone()),
-                    a.name.clone(),
-                    tr("Microsoft"),
-                )
-            })
+            .map(|n| (Player::Offline(n.clone()), n.clone(), tr("Offline")))
             .collect();
-        out.extend(
-            self.accounts
-                .offline
-                .iter()
-                .map(|n| (Player::Offline(n.clone()), n.clone(), tr("Offline"))),
-        );
         out.push((
             Player::GameName,
             self.offline_name.clone().unwrap_or_else(|| "Player".into()),
@@ -101,15 +81,14 @@ impl Launcher {
                     .rounded(px(theme::RADIUS))
                     .cursor_pointer()
                     .hover(move |s| s.bg(t.plate_soft))
-                    .child(self.profile_heads.draw(
-                        match &who {
-                            Player::Microsoft(uuid) => Some(uuid),
-                            _ => None,
-                        },
-                        24.,
-                        self.scale,
-                        &t,
-                    ))
+                    .child({
+                        // The head's key is the name's offline UUID: the face the game gives it.
+                        let key = match &who {
+                            Player::Offline(name) => Some(profile_heads::offline_key(name)),
+                            Player::GameName => None,
+                        };
+                        self.profile_heads.draw(key.as_deref(), 24., self.scale, &t)
+                    })
                     .child(
                         div()
                             .flex()
@@ -154,9 +133,7 @@ impl Launcher {
             return;
         }
         self.play_as(Player::Offline(name));
-        if !matches!(self.sign_in_state, Some(SignInState::Done(Err(_)))) {
-            self.servers.text(Field::OfflineName).set(String::new());
-        }
+        self.servers.text(Field::OfflineName).set(String::new());
     }
 
     /// Forgets an offline name and its skin.
@@ -176,8 +153,8 @@ impl Launcher {
         self.add_offline_name();
     }
 
-    /// Settings' rows for the offline names, after the Microsoft accounts: each with Play as
-    /// and Forget, then a field to add one.
+    /// Settings' rows for the offline names: each with Play as and Forget, then a field to add
+    /// one.
     pub(super) fn offline_rows(&mut self, mut n: usize, cx: &mut Context<Self>) -> (Div, usize) {
         let t = self.theme;
         let mut rows = div().flex().flex_col();
@@ -254,7 +231,7 @@ impl Launcher {
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             match instances::new_player_name() {
                                 Ok(name) => this.offline_name = Some(name),
-                                Err(e) => this.sign_in_state = Some(SignInState::Done(Err(e))),
+                                Err(e) => crate::glass_toast::say(e),
                             }
                             cx.notify();
                         }))
